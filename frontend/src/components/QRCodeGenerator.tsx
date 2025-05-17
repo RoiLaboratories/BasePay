@@ -135,12 +135,15 @@ const QRCodeGenerator = () => {
         qr_data: user.wallet.address
       };
 
-      console.log('API Configuration:', {
-        baseURL: apiUrl,
-        endpoint: '/api/qr-codes',
-        fullURL: `${apiUrl}/api/qr-codes`
+      // Log the exact data being sent
+      console.log('Sending exact data to API:', {
+        url: `${apiUrl}/api/qr-codes`,
+        method: 'POST',
+        data: paymentData,
+        walletLength: user.wallet.address.length,
+        websiteUrlLength: formData.website_url.length,
+        memoLength: formData.memo.length
       });
-      console.log('Request payload:', JSON.stringify(paymentData, null, 2));
 
       const maxRetries = 2;
       let retryCount = 0;
@@ -153,24 +156,33 @@ const QRCodeGenerator = () => {
               'Content-Type': 'application/json',
               'X-Client-Version': '1.0.0',
               'X-Request-Time': new Date().toISOString(),
-              'Origin': window.location.origin
+              'Origin': window.location.origin,
+              'X-Debug-Info': 'frontend-retry-' + retryCount
             },
             withCredentials: true,
-            timeout: 10000 // 10 second timeout
+            timeout: 15000 // Increased timeout to 15 seconds
           });
           
-          console.log('API Response:', response.data);
+          console.log('Successful API Response:', {
+            status: response.status,
+            data: response.data,
+            headers: response.headers
+          });
           
           if (!response.data) {
-            throw new Error('Failed to create QR code');
+            throw new Error('Empty response from server');
+          }
+
+          if (!response.data.qr_data) {
+            throw new Error('Missing QR data in response');
           }
 
           setQRData(response.data.qr_data);
           setSuccess(true);
-          return; // Success, exit the retry loop
+          return;
         } catch (err: any) {
           lastError = err;
-          console.error(`Attempt ${retryCount + 1} failed:`, {
+          const errorDetails = {
             message: err.message,
             status: err.response?.status,
             statusText: err.response?.statusText,
@@ -178,25 +190,37 @@ const QRCodeGenerator = () => {
             config: {
               url: err.config?.url,
               method: err.config?.method,
-              data: err.config?.data,
+              data: JSON.parse(err.config?.data || '{}'),
               headers: err.config?.headers
             }
-          });
+          };
           
+          console.error(`Request attempt ${retryCount + 1} failed:`, errorDetails);
+          
+          // Check for specific error conditions
+          if (err.response?.data?.error === 'Failed to create QR code entry') {
+            console.error('Database insertion failed. Checking data validity:', {
+              hasWalletAddress: !!paymentData.wallet_address,
+              walletAddressFormat: /^0x[a-fA-F0-9]{40}$/.test(paymentData.wallet_address),
+              websiteUrlValid: paymentData.website_url.startsWith('http'),
+              memoPresent: !!paymentData.memo,
+              amountValid: !isNaN(Number(paymentData.amount))
+            });
+          }
+
           if (err.response?.status === 500) {
             retryCount++;
             if (retryCount <= maxRetries) {
-              console.log(`Retrying... Attempt ${retryCount} of ${maxRetries}`);
-              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
+              const delay = 1000 * retryCount;
+              console.log(`Retrying in ${delay}ms... Attempt ${retryCount} of ${maxRetries}`);
+              await new Promise(resolve => setTimeout(resolve, delay));
               continue;
             }
-          } else {
-            break; // Don't retry for non-500 errors
           }
+          break;
         }
       }
 
-      // If we get here, all retries failed
       throw lastError;
     } catch (err: any) {
       console.error('All attempts failed. Final error details:', {
@@ -204,17 +228,19 @@ const QRCodeGenerator = () => {
         status: err.response?.status,
         statusText: err.response?.statusText,
         data: err.response?.data,
-        config: {
-          url: err.config?.url,
-          method: err.config?.method,
-          data: err.config?.data,
-          headers: err.config?.headers
-        }
+        config: err.config ? {
+          url: err.config.url,
+          method: err.config.method,
+          data: JSON.parse(err.config.data || '{}'),
+          headers: err.config.headers
+        } : 'No config available'
       });
       
       let errorMessage = 'Failed to generate QR code. Please try again.';
       
-      if (err.response?.status === 500) {
+      if (err.response?.data?.error === 'Failed to create QR code entry') {
+        errorMessage = 'Unable to save QR code. Please check your input and try again.';
+      } else if (err.response?.status === 500) {
         errorMessage = 'Server error. Please try again in a few moments.';
       } else if (err.response?.data?.error) {
         errorMessage = err.response.data.error;
