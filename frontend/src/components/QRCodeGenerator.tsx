@@ -13,7 +13,7 @@ const QRCodeGenerator = () => {
   const { user } = usePrivy();
   const apiUrl = import.meta.env.VITE_API_URL;
 
-  console.log('API URL:', apiUrl);
+  console.log('Current API URL:', apiUrl);
 
   if (!apiUrl) {
     return (
@@ -24,7 +24,7 @@ const QRCodeGenerator = () => {
             API URL not configured. Please check your environment variables.
           </p>
           <p className="text-sm text-gray-500 mt-2">
-            Make sure VITE_API_URL is set in your environment variables.
+            Current API URL: {apiUrl || 'not set'}
           </p>
         </div>
       </div>
@@ -87,10 +87,13 @@ const QRCodeGenerator = () => {
         throw new Error('API URL not configured');
       }
 
+      console.log('Making API request to:', apiUrl);
+
       // Check for existing QR code
       try {
         const existingQR = await checkExistingQRCode(user.wallet.address, formData.website_url);
         if (existingQR) {
+          console.log('Found existing QR:', existingQR);
           setQRData(existingQR.qr_data);
           setSuccess(true);
           setLoading(false);
@@ -113,6 +116,8 @@ const QRCodeGenerator = () => {
         qr_data: user.wallet.address
       };
 
+      console.log('Sending payment data:', paymentData);
+
       const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData);
       
       console.log('API Response:', response.data);
@@ -124,7 +129,8 @@ const QRCodeGenerator = () => {
       setQRData(response.data.qr_data);
       setSuccess(true);
     } catch (err: any) {
-      console.error('Error details:', err);
+      console.error('Full error details:', err);
+      console.error('Error response:', err.response);
       setError(
         err.response?.data?.error ||
         err.message ||
