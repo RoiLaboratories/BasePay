@@ -4,9 +4,24 @@ import WalletConnect from './components/WalletConnect';
 import './App.css';
 
 function App() {
+  const privyAppId = import.meta.env.VITE_PRIVY_APP_ID;
+
+  if (!privyAppId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white p-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Configuration Error</h1>
+          <p className="text-gray-400">
+            Missing Privy App ID. Please check your environment variables.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <PrivyProvider
-      appId={import.meta.env.VITE_PRIVY_APP_ID || ''}
+      appId={privyAppId}
       config={{
         loginMethods: ['wallet'],
         defaultChain: {
