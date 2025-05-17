@@ -58,7 +58,8 @@ function App() {
           theme: 'dark',
           accentColor: '#0052FF',
           showWalletLoginFirst: true,
-        }
+        },
+        walletConnectCloudProjectId: import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID
       }}
     >
       <AppContent />
