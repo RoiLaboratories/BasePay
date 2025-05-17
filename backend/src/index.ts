@@ -46,7 +46,7 @@ app.use('/api/', limiter);
 const allowedOrigins = [
   'http://localhost:5173',     // Local development
   'http://localhost:3000',     // Local backend
-  'https://basepay-psi.vercel.app',  // Production frontend
+  'https://basepayqr.vercel.app',  // Production frontend
   'https://basepay-api.vercel.app' // Production backend
 ];
 
