@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: basepay-backend
+    env: node
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+    healthCheckPath: /api/health
+    autoDeploy: true 
