@@ -6,7 +6,7 @@ import './App.css';
 function App() {
   return (
     <PrivyProvider
-      appId={import.meta.env.VITE_PRIVY_APP_ID}
+      appId={import.meta.env.VITE_PRIVY_APP_ID || ''}
       config={{
         loginMethods: ['wallet'],
         defaultChain: {
@@ -53,6 +53,10 @@ function App() {
 
 function AppContent() {
   const { authenticated } = usePrivy();
+
+  if (typeof window === 'undefined') {
+    return null; // Prevent rendering during SSR
+  }
 
   return (
     <div className="min-h-screen h-screen flex flex-col bg-gray-900 text-white">
