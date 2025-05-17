@@ -11,6 +11,24 @@ interface QRFormData {
 
 const QRCodeGenerator = () => {
   const { user } = usePrivy();
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  if (!apiUrl) {
+    return (
+      <div className="flex-grow flex items-center justify-center p-4">
+        <div className="text-center">
+          <h2 className="text-xl font-bold mb-4 text-red-400">Configuration Error</h2>
+          <p className="text-gray-400">
+            API URL not configured. Please check your environment variables.
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Make sure VITE_API_URL is set in your environment variables.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const [formData, setFormData] = useState<QRFormData>({
     website_url: '',
     memo: '',
@@ -36,7 +54,7 @@ const QRCodeGenerator = () => {
   const checkExistingQRCode = async (walletAddress: string, websiteUrl: string) => {
     try {
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/qr-codes/${walletAddress}/${encodeURIComponent(websiteUrl)}`
+        `${apiUrl}/api/qr-codes/${walletAddress}/${encodeURIComponent(websiteUrl)}`
       );
       return response.data;
     } catch (err: any) {
@@ -63,11 +81,6 @@ const QRCodeGenerator = () => {
     try {
       if (!user?.wallet?.address) {
         throw new Error('Wallet not connected');
-      }
-
-      const apiUrl = import.meta.env.VITE_API_URL;
-      if (!apiUrl) {
-        throw new Error('API URL not configured');
       }
 
       // Check for existing QR code
