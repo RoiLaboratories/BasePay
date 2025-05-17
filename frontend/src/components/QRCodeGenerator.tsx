@@ -13,6 +13,8 @@ const QRCodeGenerator = () => {
   const { user } = usePrivy();
   const apiUrl = import.meta.env.VITE_API_URL;
 
+  console.log('API URL:', apiUrl);
+
   if (!apiUrl) {
     return (
       <div className="flex-grow flex items-center justify-center p-4">
@@ -113,11 +115,13 @@ const QRCodeGenerator = () => {
 
       const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData);
       
+      console.log('API Response:', response.data);
+      
       if (!response.data) {
         throw new Error('Failed to create QR code');
       }
 
-      setQRData(user.wallet.address);
+      setQRData(response.data.qr_data);
       setSuccess(true);
     } catch (err: any) {
       console.error('Error details:', err);
