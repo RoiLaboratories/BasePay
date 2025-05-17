@@ -44,15 +44,18 @@ app.use('/api/', limiter);
 
 // CORS configuration
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:5173',
-  'https://basepay.vercel.app' // Add your production frontend URL here
+  'http://localhost:5173',     // Local development
+  'http://localhost:3000',     // Local backend
+  'https://basepay-psi.vercel.app',  // Production frontend
+  'https://basepay-api.vercel.app' // Production backend
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.some(allowed => origin.includes(allowed))) {
       callback(null, true);
     } else {
+      logger.warn('CORS blocked origin:', { origin });
       callback(new Error('Not allowed by CORS'));
     }
   },
