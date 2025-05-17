@@ -116,9 +116,20 @@ const QRCodeGenerator = () => {
         qr_data: user.wallet.address
       };
 
-      console.log('Sending payment data:', paymentData);
+      console.log('API Configuration:', {
+        baseURL: apiUrl,
+        endpoint: '/api/qr-codes',
+        fullURL: `${apiUrl}/api/qr-codes`
+      });
+      console.log('Request payload:', JSON.stringify(paymentData, null, 2));
 
-      const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData);
+      const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Version': '1.0.0',
+          'X-Request-Time': new Date().toISOString()
+        }
+      });
       
       console.log('API Response:', response.data);
       
@@ -129,8 +140,17 @@ const QRCodeGenerator = () => {
       setQRData(response.data.qr_data);
       setSuccess(true);
     } catch (err: any) {
-      console.error('Full error details:', err);
-      console.error('Error response:', err.response);
+      console.error('Full error details:', {
+        message: err.message,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        config: {
+          url: err.config?.url,
+          method: err.config?.method,
+          data: err.config?.data
+        }
+      });
       setError(
         err.response?.data?.error ||
         err.message ||
