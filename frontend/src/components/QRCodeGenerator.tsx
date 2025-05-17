@@ -42,9 +42,7 @@ const QRCodeGenerator = () => {
   const extractWebsiteName = (url: string): string => {
     try {
       const urlObj = new URL(url);
-      // Remove www. if present and get the first part of the domain
       const domain = urlObj.hostname.replace('www.', '').split('.')[0];
-      // Capitalize first letter and return
       return domain.charAt(0).toUpperCase() + domain.slice(1);
     } catch (err) {
       return 'Unknown';
@@ -58,10 +56,10 @@ const QRCodeGenerator = () => {
       );
       return response.data;
     } catch (err: any) {
-      if (err.response?.status !== 404) {
-        throw err;
+      if (err.response?.status === 404) {
+        return null;
       }
-      return null;
+      throw err;
     }
   };
 
@@ -80,7 +78,11 @@ const QRCodeGenerator = () => {
 
     try {
       if (!user?.wallet?.address) {
-        throw new Error('Wallet not connected');
+        throw new Error('Please connect your wallet first');
+      }
+
+      if (!apiUrl) {
+        throw new Error('API URL not configured');
       }
 
       // Check for existing QR code
@@ -93,6 +95,7 @@ const QRCodeGenerator = () => {
           return;
         }
       } catch (checkErr: any) {
+        console.error('Error checking existing QR:', checkErr);
         if (checkErr.response?.status !== 404) {
           throw checkErr;
         }
@@ -105,28 +108,24 @@ const QRCodeGenerator = () => {
         website_name: websiteName,
         memo: formData.memo,
         amount: formData.amount || '0',
+        qr_data: user.wallet.address
       };
 
-      await axios.post(`${apiUrl}/api/qr-codes`, {
-        ...paymentData,
-        qr_data: user.wallet.address // Store just the wallet address
-      });
+      const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData);
+      
+      if (!response.data) {
+        throw new Error('Failed to create QR code');
+      }
 
       setQRData(user.wallet.address);
       setSuccess(true);
     } catch (err: any) {
       console.error('Error details:', err);
-      if (err.message === 'API URL not configured') {
-        setError('API URL not configured. Please check your environment variables.');
-      } else if (err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else if (err.message === 'Wallet not connected') {
-        setError('Please connect your wallet first');
-      } else if (err.message.includes('Network Error')) {
-        setError('Network error. Please check if the API server is running and accessible.');
-      } else {
-        setError('Failed to generate QR code. Please try again.');
-      }
+      setError(
+        err.response?.data?.error ||
+        err.message ||
+        'Failed to generate QR code. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
