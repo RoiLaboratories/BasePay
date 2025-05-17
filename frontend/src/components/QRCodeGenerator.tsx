@@ -87,6 +87,25 @@ const QRCodeGenerator = () => {
         throw new Error('API URL not configured');
       }
 
+      // Validate input data
+      if (!formData.website_url) {
+        throw new Error('Website URL is required');
+      }
+
+      try {
+        new URL(formData.website_url);
+      } catch (err) {
+        throw new Error('Please enter a valid website URL');
+      }
+
+      if (!formData.memo.trim()) {
+        throw new Error('Memo is required');
+      }
+
+      if (formData.amount && (isNaN(Number(formData.amount)) || Number(formData.amount) < 0)) {
+        throw new Error('Please enter a valid amount');
+      }
+
       console.log('Making API request to:', apiUrl);
 
       // Check for existing QR code
@@ -123,24 +142,64 @@ const QRCodeGenerator = () => {
       });
       console.log('Request payload:', JSON.stringify(paymentData, null, 2));
 
-      const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Client-Version': '1.0.0',
-          'X-Request-Time': new Date().toISOString()
+      const maxRetries = 2;
+      let retryCount = 0;
+      let lastError = null;
+
+      while (retryCount <= maxRetries) {
+        try {
+          const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData, {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Client-Version': '1.0.0',
+              'X-Request-Time': new Date().toISOString(),
+              'Origin': window.location.origin
+            },
+            withCredentials: true,
+            timeout: 10000 // 10 second timeout
+          });
+          
+          console.log('API Response:', response.data);
+          
+          if (!response.data) {
+            throw new Error('Failed to create QR code');
+          }
+
+          setQRData(response.data.qr_data);
+          setSuccess(true);
+          return; // Success, exit the retry loop
+        } catch (err: any) {
+          lastError = err;
+          console.error(`Attempt ${retryCount + 1} failed:`, {
+            message: err.message,
+            status: err.response?.status,
+            statusText: err.response?.statusText,
+            data: err.response?.data,
+            config: {
+              url: err.config?.url,
+              method: err.config?.method,
+              data: err.config?.data,
+              headers: err.config?.headers
+            }
+          });
+          
+          if (err.response?.status === 500) {
+            retryCount++;
+            if (retryCount <= maxRetries) {
+              console.log(`Retrying... Attempt ${retryCount} of ${maxRetries}`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
+              continue;
+            }
+          } else {
+            break; // Don't retry for non-500 errors
+          }
         }
-      });
-      
-      console.log('API Response:', response.data);
-      
-      if (!response.data) {
-        throw new Error('Failed to create QR code');
       }
 
-      setQRData(response.data.qr_data);
-      setSuccess(true);
+      // If we get here, all retries failed
+      throw lastError;
     } catch (err: any) {
-      console.error('Full error details:', {
+      console.error('All attempts failed. Final error details:', {
         message: err.message,
         status: err.response?.status,
         statusText: err.response?.statusText,
@@ -148,14 +207,22 @@ const QRCodeGenerator = () => {
         config: {
           url: err.config?.url,
           method: err.config?.method,
-          data: err.config?.data
+          data: err.config?.data,
+          headers: err.config?.headers
         }
       });
-      setError(
-        err.response?.data?.error ||
-        err.message ||
-        'Failed to generate QR code. Please try again.'
-      );
+      
+      let errorMessage = 'Failed to generate QR code. Please try again.';
+      
+      if (err.response?.status === 500) {
+        errorMessage = 'Server error. Please try again in a few moments.';
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
