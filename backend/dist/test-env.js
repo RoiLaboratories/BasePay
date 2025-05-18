@@ -1,8 +1,11 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-var dotenv_1 = require("dotenv");
+const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-var requiredEnvVars = [
+const requiredEnvVars = [
     'PORT',
     'NODE_ENV',
     'SUPABASE_URL',
@@ -11,20 +14,20 @@ var requiredEnvVars = [
 ];
 console.log('\nEnvironment Variables Check:');
 console.log('============================\n');
-var missingVars = false;
-requiredEnvVars.forEach(function (varName) {
-    var value = process.env[varName];
+let missingVars = false;
+requiredEnvVars.forEach(varName => {
+    const value = process.env[varName];
     if (!value) {
-        console.log("\u274C ".concat(varName, " is missing or empty"));
+        console.log(`❌ ${varName} is missing or empty`);
         missingVars = true;
     }
     else {
         // For sensitive values, just show that they exist
         if (varName === 'SUPABASE_KEY') {
-            console.log("\u2705 ".concat(varName, " is set (value hidden)"));
+            console.log(`✅ ${varName} is set (value hidden)`);
         }
         else {
-            console.log("\u2705 ".concat(varName, " = ").concat(value));
+            console.log(`✅ ${varName} = ${value}`);
         }
     }
 });

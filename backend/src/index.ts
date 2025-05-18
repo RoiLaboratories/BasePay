@@ -86,7 +86,7 @@ interface QRDisplayData {
 }
 
 interface QRCodeData {
-  id: number;
+  id: string;
   wallet_address: string;
   website_url: string;
   website_name: string;
