@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { QRCodeSVG } from 'qrcode.react';
 import axios from 'axios';
+import NetworkCheck from './NetworkCheck';
 
 interface QRFormData {
   website_url: string;
@@ -12,6 +13,7 @@ interface QRFormData {
 const QRCodeGenerator = () => {
   const { user } = usePrivy();
   const apiUrl = import.meta.env.VITE_API_URL;
+  const [isNetworkValid, setIsNetworkValid] = useState(false);
 
   console.log('Current API URL:', apiUrl);
 
@@ -410,33 +412,52 @@ const QRCodeGenerator = () => {
           <div className="flex-1 flex items-center justify-center">
             {qrData ? (
               <div className="text-center animate-fadeIn">
-                <div className="bg-white p-6 rounded-lg shadow-lg inline-block mb-4">
-                  <div className="text-gray-800 font-medium mb-2">
-                    {extractWebsiteName(formData.website_url)} USDC Payment Address
+                <NetworkCheck 
+                  onNetworkValid={() => setIsNetworkValid(true)}
+                  onNetworkInvalid={() => setIsNetworkValid(false)}
+                />
+                
+                {isNetworkValid ? (
+                  <>
+                    <div className="bg-white p-6 rounded-lg shadow-lg inline-block mb-4">
+                      <div className="text-gray-800 font-medium mb-2">
+                        {extractWebsiteName(formData.website_url)} USDC Payment Address
+                      </div>
+                      <QRCodeSVG 
+                        id="qr-code-svg"
+                        value={user?.wallet?.address || ''}
+                        size={256} 
+                        level="H"
+                        includeMargin={true}
+                      />
+                      <div className="text-gray-600 text-sm mt-2">
+                        Scan to pay with USDC on Base
+                      </div>
+                    </div>
+                    <div className="mb-4 text-gray-300">
+                      <p className="font-medium mb-1">USDC Payment Address:</p>
+                      <p className="font-mono select-all cursor-pointer break-all" title="Click to select address">
+                        {user?.wallet?.address || ''}
+                      </p>
+                    </div>
+                    <button
+                      onClick={downloadQR}
+                      className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 transform hover:scale-105"
+                    >
+                      Download QR Code
+                    </button>
+                  </>
+                ) : (
+                  <div className="text-center p-4 bg-red-900/20 rounded-lg">
+                    <svg className="w-12 h-12 text-red-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <h3 className="text-lg font-medium text-red-400 mb-2">Network Error</h3>
+                    <p className="text-gray-300">
+                      Please switch your wallet to Base mainnet to view and scan this QR code.
+                    </p>
                   </div>
-                  <QRCodeSVG 
-                    id="qr-code-svg"
-                    value={user?.wallet?.address || ''}
-                    size={256} 
-                    level="H"
-                    includeMargin={true}
-                  />
-                  <div className="text-gray-600 text-sm mt-2">
-                    Scan to pay with USDC on Base
-                  </div>
-                </div>
-                <div className="mb-4 text-gray-300">
-                  <p className="font-medium mb-1">USDC Payment Address:</p>
-                  <p className="font-mono select-all cursor-pointer break-all" title="Click to select address">
-                    {user?.wallet?.address || ''}
-                  </p>
-                </div>
-                <button
-                  onClick={downloadQR}
-                  className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 transform hover:scale-105"
-                >
-                  Download QR Code
-                </button>
+                )}
               </div>
             ) : (
               <div className="text-center text-gray-400">
