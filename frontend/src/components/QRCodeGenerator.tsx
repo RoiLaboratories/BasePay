@@ -51,20 +51,6 @@ const QRCodeGenerator = () => {
     }
   };
 
-  const checkExistingQRCode = async (walletAddress: string, websiteUrl: string) => {
-    try {
-      const response = await axios.get(
-        `${apiUrl}/api/qr-codes/${walletAddress}/${encodeURIComponent(websiteUrl)}`
-      );
-      return response.data;
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        return null;
-      }
-      throw err;
-    }
-  };
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -92,57 +78,73 @@ const QRCodeGenerator = () => {
         throw new Error('Website URL is required');
       }
 
+      let websiteUrl = formData.website_url;
       try {
-        new URL(formData.website_url);
+        const url = new URL(websiteUrl);
+        // Remove www. from the URL to maintain consistency
+        websiteUrl = url.protocol + '//' + url.hostname.replace(/^www\./, '') + url.pathname + url.search;
+        
+        // Validate URL format
+        if (!url.protocol || !url.hostname) {
+          throw new Error('Invalid URL format');
+        }
+        
+        // Check for valid TLD
+        const tld = url.hostname.split('.').pop();
+        if (!tld || tld.length < 2) {
+          throw new Error('Invalid domain name');
+        }
       } catch (err) {
-        throw new Error('Please enter a valid website URL');
+        throw new Error('Please enter a valid website URL (e.g., https://example.com)');
       }
 
       if (!formData.memo.trim()) {
         throw new Error('Memo is required');
       }
 
+      if (formData.memo.length > 100) {
+        throw new Error('Memo must be less than 100 characters');
+      }
+
       if (formData.amount && (isNaN(Number(formData.amount)) || Number(formData.amount) < 0)) {
         throw new Error('Please enter a valid amount');
       }
 
-      console.log('Making API request to:', apiUrl);
-
-      // Check for existing QR code
-      try {
-        const existingQR = await checkExistingQRCode(user.wallet.address, formData.website_url);
-        if (existingQR) {
-          console.log('Found existing QR:', existingQR);
-          setQRData(existingQR.qr_data);
-          setSuccess(true);
-          setLoading(false);
-          return;
-        }
-      } catch (checkErr: any) {
-        console.error('Error checking existing QR:', checkErr);
-        if (checkErr.response?.status !== 404) {
-          throw checkErr;
-        }
-      }
-
-      const websiteName = extractWebsiteName(formData.website_url);
+      const websiteName = extractWebsiteName(websiteUrl);
       const paymentData = {
         wallet_address: user.wallet.address,
-        website_url: formData.website_url,
+        website_url: websiteUrl, // Use the normalized URL
         website_name: websiteName,
-        memo: formData.memo,
+        memo: formData.memo.trim(),
         amount: formData.amount || '0',
         qr_data: user.wallet.address
       };
+
+      // Validate data constraints
+      if (paymentData.website_url.length > 255) {
+        throw new Error('Website URL is too long (maximum 255 characters)');
+      }
+
+      if (paymentData.website_name.length > 50) {
+        throw new Error('Website name is too long (maximum 50 characters)');
+      }
+
+      if (!paymentData.wallet_address.match(/^0x[a-fA-F0-9]{40}$/)) {
+        throw new Error('Invalid wallet address format');
+      }
 
       // Log the exact data being sent
       console.log('Sending exact data to API:', {
         url: `${apiUrl}/api/qr-codes`,
         method: 'POST',
         data: paymentData,
-        walletLength: user.wallet.address.length,
-        websiteUrlLength: formData.website_url.length,
-        memoLength: formData.memo.length
+        validation: {
+          walletAddressValid: /^0x[a-fA-F0-9]{40}$/.test(paymentData.wallet_address),
+          websiteUrlNormalized: websiteUrl === paymentData.website_url,
+          websiteNameValid: websiteName === paymentData.website_name,
+          memoValid: paymentData.memo.length > 0 && paymentData.memo.length <= 100,
+          amountValid: !isNaN(Number(paymentData.amount)) && Number(paymentData.amount) >= 0
+        }
       });
 
       const maxRetries = 2;
@@ -203,9 +205,28 @@ const QRCodeGenerator = () => {
               hasWalletAddress: !!paymentData.wallet_address,
               walletAddressFormat: /^0x[a-fA-F0-9]{40}$/.test(paymentData.wallet_address),
               websiteUrlValid: paymentData.website_url.startsWith('http'),
+              websiteUrlLength: paymentData.website_url.length,
+              websiteNameLength: paymentData.website_name.length,
               memoPresent: !!paymentData.memo,
-              amountValid: !isNaN(Number(paymentData.amount))
+              memoLength: paymentData.memo.length,
+              amountValid: !isNaN(Number(paymentData.amount)),
+              qrDataValid: paymentData.qr_data === paymentData.wallet_address
             });
+
+            // Check for potential duplicate entry
+            try {
+              const existingCheck = await axios.get(
+                `${apiUrl}/api/qr-codes/${paymentData.wallet_address}/${encodeURIComponent(paymentData.website_url)}`,
+                { timeout: 5000 }
+              );
+              if (existingCheck.data) {
+                throw new Error('A QR code already exists for this website');
+              }
+            } catch (checkErr: any) {
+              if (checkErr.response?.status !== 404) {
+                console.error('Error checking for existing QR code:', checkErr);
+              }
+            }
           }
 
           if (err.response?.status === 500) {
@@ -239,7 +260,11 @@ const QRCodeGenerator = () => {
       let errorMessage = 'Failed to generate QR code. Please try again.';
       
       if (err.response?.data?.error === 'Failed to create QR code entry') {
-        errorMessage = 'Unable to save QR code. Please check your input and try again.';
+        errorMessage = 'Unable to save QR code. This could be due to:\n' +
+          '• A QR code already exists for this website\n' +
+          '• Invalid website URL format\n' +
+          '• Database connection issues\n\n' +
+          'Please try again with a different website URL or contact support if the issue persists.';
       } else if (err.response?.status === 500) {
         errorMessage = 'Server error. Please try again in a few moments.';
       } else if (err.response?.data?.error) {
