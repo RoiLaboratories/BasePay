@@ -1,3 +1,6 @@
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- Create QR codes table
 CREATE TABLE IF NOT EXISTS qr_codes (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,

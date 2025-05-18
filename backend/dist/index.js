@@ -112,7 +112,14 @@ const supabase = (0, supabase_js_1.createClient)(supabaseUrl, supabaseKey);
 const createQRCode = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { wallet_address, website_url, website_name, memo, amount, qr_data } = req.body;
-        logger.info('Creating QR code', { wallet_address, website_url, website_name });
+        logger.info('Creating QR code - Request details:', {
+            wallet_address,
+            website_url,
+            website_name,
+            memo_length: memo === null || memo === void 0 ? void 0 : memo.length,
+            amount,
+            qr_data_matches: qr_data === wallet_address
+        });
         // Validate website name
         if (!website_name) {
             logger.warn('Website name missing in request');
@@ -120,7 +127,10 @@ const createQRCode = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         // Validate that qr_data matches wallet_address
         if (qr_data !== wallet_address) {
-            logger.warn('QR data mismatch with wallet address');
+            logger.warn('QR data mismatch with wallet address', {
+                qr_data,
+                wallet_address
+            });
             return res.status(400).json({ error: 'QR data must match wallet address' });
         }
         // Check for existing QR code with same wallet and URL combination
@@ -130,12 +140,23 @@ const createQRCode = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             .eq('wallet_address', wallet_address)
             .eq('website_url', website_url)
             .single();
-        if (searchError && searchError.code !== 'PGRST116') {
-            logger.error('Supabase search error:', { error: searchError });
-            return res.status(500).json({ error: 'Database search error' });
+        if (searchError) {
+            logger.error('Supabase search error:', {
+                error: searchError,
+                code: searchError.code,
+                message: searchError.message,
+                details: searchError.details
+            });
+            if (searchError.code !== 'PGRST116') {
+                return res.status(500).json({ error: 'Database search error' });
+            }
         }
         if (existingQR) {
-            logger.info('Duplicate QR code request', { wallet_address, website_url });
+            logger.info('Duplicate QR code request', {
+                wallet_address,
+                website_url,
+                existing_id: existingQR.id
+            });
             return res.status(409).json({
                 error: 'QR code already exists for this combination of wallet address and website URL'
             });
@@ -146,12 +167,22 @@ const createQRCode = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             .select('*')
             .eq('website_url', website_url)
             .single();
-        if (urlError && urlError.code !== 'PGRST116') {
-            logger.error('URL check error:', { error: urlError });
-            return res.status(500).json({ error: 'Database check error' });
+        if (urlError) {
+            logger.error('URL check error:', {
+                error: urlError,
+                code: urlError.code,
+                message: urlError.message,
+                details: urlError.details
+            });
+            if (urlError.code !== 'PGRST116') {
+                return res.status(500).json({ error: 'Database check error' });
+            }
         }
         if (urlCheck) {
-            logger.info('Website URL already has QR code', { website_url });
+            logger.info('Website URL already has QR code', {
+                website_url,
+                existing_wallet: urlCheck.wallet_address
+            });
             return res.status(409).json({
                 error: 'This website URL already has a QR code generated'
             });
@@ -172,22 +203,42 @@ const createQRCode = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             .select()
             .single();
         if (insertError) {
-            logger.error('Supabase insert error:', { error: insertError });
+            logger.error('Supabase insert error:', {
+                error: insertError,
+                code: insertError.code,
+                message: insertError.message,
+                details: insertError.details,
+                data: {
+                    wallet_address,
+                    website_url,
+                    website_name,
+                    memo_length: memo === null || memo === void 0 ? void 0 : memo.length,
+                    amount
+                }
+            });
             return res.status(500).json({ error: 'Failed to create QR code entry' });
         }
         if (!newQR) {
             logger.error('Failed to retrieve created QR code');
             return res.status(500).json({ error: 'Failed to retrieve created QR code' });
         }
-        logger.info('QR code created successfully', { id: newQR.id });
+        logger.info('QR code created successfully', {
+            id: newQR.id,
+            wallet_address: newQR.wallet_address,
+            website_url: newQR.website_url
+        });
         res.status(201).json(newQR);
     }
     catch (error) {
-        logger.error('Error creating QR code:', { error });
+        logger.error('Error creating QR code:', {
+            error,
+            message: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+        });
         res.status(500).json({
             error: process.env.NODE_ENV === 'production'
                 ? 'Failed to create QR code'
-                : error.message
+                : error instanceof Error ? error.message : 'Unknown error'
         });
     }
 });
