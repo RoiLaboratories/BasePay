@@ -21,6 +21,12 @@ const QRCodeGenerator = () => {
   const apiUrl = import.meta.env.VITE_API_URL;
   const adminWallet = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
 
+  console.log('Environment Variables:', {
+    apiUrl,
+    adminWallet,
+    envKeys: Object.keys(import.meta.env)
+  });
+
   const [formData, setFormData] = useState<QRFormData>({
     email: '',
     memo: '',
@@ -55,8 +61,14 @@ const QRCodeGenerator = () => {
         throw new Error('Please connect your wallet first');
       }
 
-      if (!adminWallet) {
-        throw new Error('Admin wallet not configured');
+      if (!adminWallet || adminWallet.trim() === '') {
+        console.error('Admin wallet is missing or empty:', adminWallet);
+        throw new Error('Admin wallet not configured properly');
+      }
+
+      if (!ethers.isAddress(adminWallet)) {
+        console.error('Invalid admin wallet address:', adminWallet);
+        throw new Error('Invalid admin wallet address format');
       }
 
       if (!validateEmail(formData.email)) {
@@ -104,6 +116,9 @@ const QRCodeGenerator = () => {
         qr_data: JSON.stringify(qrData)
       };
 
+      console.log('Sending request to:', `${apiUrl}/api/qr-codes`);
+      console.log('Payment data:', paymentData);
+
       const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData, {
         headers: {
           'Content-Type': 'application/json',
@@ -114,12 +129,26 @@ const QRCodeGenerator = () => {
         throw new Error('Empty response from server');
       }
 
-      setQRData(JSON.stringify(qrData));
+      // Set QR data directly from the response
+      setQRData(response.data.qr_data || JSON.stringify(qrData));
       setSuccess(true);
     } catch (err: any) {
       console.error('Error:', err);
       setPaymentStatus('failed');
-      setError(err.response?.data?.error || err.message || 'Failed to generate QR code');
+      if (err.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Response data:', err.response.data);
+        console.error('Response status:', err.response.status);
+        setError(err.response.data?.error || 'Failed to generate QR code');
+      } else if (err.request) {
+        // The request was made but no response was received
+        console.error('No response received:', err.request);
+        setError('No response from server. Please try again.');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        setError(err.message || 'Failed to generate QR code');
+      }
     } finally {
       setLoading(false);
     }
