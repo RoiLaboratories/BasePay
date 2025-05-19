@@ -95,10 +95,17 @@ const QRCodeGenerator = () => {
       // Convert 0.0001 USDC to the correct decimal places (USDC has 6 decimals)
       const amount = ethers.parseUnits("0.0001", 6);
 
-      // Send 0.0001 USDC payment
+      // Send USDC payment
       setPaymentStatus('processing');
-      const tx = await usdcContract.transfer(adminWallet, amount);
-      await tx.wait(); // Wait for transaction confirmation
+      const tx = await usdcContract.transfer(adminWallet, amount, {
+        gasLimit: 100000 // Add explicit gas limit
+      });
+      
+      // Wait for transaction confirmation
+      const receipt = await tx.wait();
+      if (!receipt.status) {
+        throw new Error('Transaction failed');
+      }
       setPaymentStatus('completed');
 
       const emailName = formData.email.split('@')[0];
