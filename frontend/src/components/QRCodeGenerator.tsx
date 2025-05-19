@@ -55,6 +55,10 @@ const QRCodeGenerator = () => {
         throw new Error('Please connect your wallet first');
       }
 
+      if (!adminWallet) {
+        throw new Error('Admin wallet not configured');
+      }
+
       if (!validateEmail(formData.email)) {
         throw new Error('Please enter a valid email address');
       }
