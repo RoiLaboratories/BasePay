@@ -180,7 +180,7 @@ const QRCodeGenerator = () => {
         ctx!.fillText(`Requested Amount: ${formData.amount} USDC`, canvas.width/2, 370);
       }
       
-      ctx!.fillText('Generation Fee: 0.30 USDC', canvas.width/2, 400);
+      // ctx!.fillText('Generation Fee: 0.30 USDC', canvas.width/2, 400);
       
       // Add wallet address
       ctx!.font = '14px monospace';
