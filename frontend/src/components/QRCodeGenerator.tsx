@@ -14,15 +14,9 @@ interface QRFormData {
 
 const QRCodeGenerator = () => {
   const { user, sendTransaction } = usePrivy();
-  const apiUrl = 'https://basepay-api.vercel.app'; // Hardcode the correct API URL
+  const apiUrl = 'https://basepay-api.vercel.app';
   const adminWallet = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
   const GENERATION_FEE = '0.30'; // USDC fee for QR code generation
-
-  console.log('Environment Variables:', {
-    apiUrl,
-    adminWallet,
-    envKeys: Object.keys(import.meta.env)
-  });
 
   const [formData, setFormData] = useState<QRFormData>({
     email: '',
@@ -106,9 +100,6 @@ const QRCodeGenerator = () => {
         qr_data: JSON.stringify(qrData)
       };
 
-      console.log('Sending request to:', `${apiUrl}/api/qr-codes`);
-      console.log('Payment data:', paymentData);
-
       const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData, {
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +111,6 @@ const QRCodeGenerator = () => {
         throw new Error('Empty response from server');
       }
 
-      // Set QR data directly from the response
       setQRData(response.data.qr_data);
       setSuccess(true);
     } catch (err: any) {
