@@ -90,7 +90,8 @@ const QRCodeGenerator = () => {
       const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData, {
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        withCredentials: true
       });
 
       if (!response.data) {
