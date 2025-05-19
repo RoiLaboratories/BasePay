@@ -66,12 +66,13 @@ const QRCodeGenerator = () => {
         email: formData.email
       });
 
-      if (response.data.success) {
+      if (response.data && response.data.success) {
         setOtpSent(true);
       } else {
-        throw new Error(response.data.error || 'Failed to send OTP');
+        throw new Error('Failed to send OTP');
       }
     } catch (err: any) {
+      console.error('Error sending OTP:', err);
       setError(err.response?.data?.error || err.message || 'Failed to send OTP');
     } finally {
       setLoading(false);
