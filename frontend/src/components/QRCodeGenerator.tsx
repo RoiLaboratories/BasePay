@@ -19,7 +19,6 @@ interface QRFormData {
 const QRCodeGenerator = () => {
   const { user } = usePrivy();
   const apiUrl = import.meta.env.VITE_API_URL;
-  console.log('API URL:', apiUrl); // Debug log
   const adminWallet = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
 
   const [formData, setFormData] = useState<QRFormData>({
@@ -31,8 +30,6 @@ const QRCodeGenerator = () => {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
 
   const validateEmail = (email: string): boolean => {
@@ -45,38 +42,6 @@ const QRCodeGenerator = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
     setSuccess(false);
-  };
-
-  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setOtp(e.target.value);
-    setError('');
-  };
-
-  const sendOtp = async () => {
-    if (!validateEmail(formData.email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await axios.post(`${apiUrl}/api/send-otp`, {
-        email: formData.email
-      });
-
-      if (response.data && response.data.success) {
-        setOtpSent(true);
-      } else {
-        throw new Error('Failed to send OTP');
-      }
-    } catch (err: any) {
-      console.error('Error sending OTP:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to send OTP');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const generateQRCode = async (e: React.FormEvent) => {
@@ -132,12 +97,8 @@ const QRCodeGenerator = () => {
         email_name: emailName,
         memo: formData.memo.trim(),
         amount: formData.amount || '0',
-        qr_data: JSON.stringify(qrData),
-        otp: otp
+        qr_data: JSON.stringify(qrData)
       };
-
-      console.log('Sending request to:', `${apiUrl}/api/qr-codes`); // Debug log
-      console.log('Payment data:', paymentData); // Debug log
 
       const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData, {
         headers: {
@@ -147,10 +108,6 @@ const QRCodeGenerator = () => {
 
       if (!response.data) {
         throw new Error('Empty response from server');
-      }
-
-      if (!response.data.qr_data) {
-        throw new Error('Missing QR data in response');
       }
 
       setQRData(JSON.stringify(qrData));
@@ -199,53 +156,17 @@ const QRCodeGenerator = () => {
                   <label htmlFor="email" className="block text-sm font-medium text-gray-300">
                     Email Address
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      required
-                      className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="your.email@example.com"
-                      disabled={otpSent}
-                    />
-                    {!otpSent && (
-                      <button
-                        type="button"
-                        onClick={sendOtp}
-                        disabled={loading || !validateEmail(formData.email)}
-                        className={`mt-1 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                          loading || !validateEmail(formData.email)
-                            ? 'bg-gray-600 cursor-not-allowed'
-                            : 'bg-orange-600 hover:bg-orange-700 text-white'
-                        }`}
-                      >
-                        Send OTP
-                      </button>
-                    )}
-                  </div>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    required
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="your.email@example.com"
+                  />
                 </div>
-
-                {otpSent && (
-                  <div>
-                    <label htmlFor="otp" className="block text-sm font-medium text-gray-300">
-                      Enter OTP
-                    </label>
-                    <input
-                      type="text"
-                      id="otp"
-                      name="otp"
-                      required
-                      maxLength={6}
-                      className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
-                      value={otp}
-                      onChange={handleOtpChange}
-                      placeholder="Enter 6-digit OTP"
-                    />
-                  </div>
-                )}
 
                 <div>
                   <label htmlFor="memo" className="block text-sm font-medium text-gray-300">
@@ -283,9 +204,9 @@ const QRCodeGenerator = () => {
 
               <button
                 type="submit"
-                disabled={loading || !otpSent || !otp}
+                disabled={loading}
                 className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 ${
-                  loading || !otpSent || !otp
+                  loading
                     ? 'bg-gray-600 cursor-not-allowed'
                     : 'bg-orange-600 hover:bg-orange-700 text-white'
                 }`}
