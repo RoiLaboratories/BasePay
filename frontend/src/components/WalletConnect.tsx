@@ -61,7 +61,7 @@ const WalletConnect = () => {
         </div>
         <button
           onClick={handleLogin}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg flex items-center gap-2 transition-all duration-200 transform hover:scale-105"
+          className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-lg flex items-center gap-2 transition-all duration-200 transform hover:scale-105"
         >
           <svg
             className="w-6 h-6"
@@ -84,7 +84,7 @@ const WalletConnect = () => {
 
   if (isCheckingNetwork) {
     return (
-      <div className="bg-gray-700 text-white px-4 py-2 rounded-lg">
+      <div className="bg-gray-800 text-white px-4 py-2 rounded-lg">
         Checking network...
       </div>
     );
@@ -118,7 +118,7 @@ const WalletConnect = () => {
     <div className="relative">
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200"
+        className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200"
       >
         <div className="w-2 h-2 bg-green-400 rounded-full"></div>
         {formatAddress(user.wallet.address)}
@@ -133,13 +133,13 @@ const WalletConnect = () => {
       </button>
 
       {showDropdown && (
-        <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 animate-fadeIn">
+        <div className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-lg shadow-xl border border-gray-800 animate-fadeIn">
           <button
             onClick={() => {
               logout();
               setShowDropdown(false);
             }}
-            className="w-full text-left px-4 py-2 text-white hover:bg-gray-700 rounded-lg transition-colors duration-200"
+            className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors duration-200"
           >
             Disconnect Wallet
           </button>

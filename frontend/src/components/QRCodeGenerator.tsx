@@ -2,9 +2,16 @@ import { useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { QRCodeSVG } from 'qrcode.react';
 import axios from 'axios';
+import { ethers } from 'ethers';
+
+const USDC_CONTRACT_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base Mainnet USDC
+const USDC_ABI = [
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function balanceOf(address account) view returns (uint256)"
+];
 
 interface QRFormData {
-  website_url: string;
+  email: string;
   memo: string;
   amount: string;
 }
@@ -12,27 +19,11 @@ interface QRFormData {
 const QRCodeGenerator = () => {
   const { user } = usePrivy();
   const apiUrl = import.meta.env.VITE_API_URL;
-
-  console.log('Current API URL:', apiUrl);
-
-  if (!apiUrl) {
-    return (
-      <div className="flex-grow flex items-center justify-center p-4">
-        <div className="text-center">
-          <h2 className="text-xl font-bold mb-4 text-red-400">Configuration Error</h2>
-          <p className="text-gray-400">
-            API URL not configured. Please check your environment variables.
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Current API URL: {apiUrl || 'not set'}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  console.log('API URL:', apiUrl); // Debug log
+  const adminWallet = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
 
   const [formData, setFormData] = useState<QRFormData>({
-    website_url: '',
+    email: '',
     memo: '',
     amount: '',
   });
@@ -40,15 +31,13 @@ const QRCodeGenerator = () => {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
 
-  const extractWebsiteName = (url: string): string => {
-    try {
-      const urlObj = new URL(url);
-      const domain = urlObj.hostname.replace('www.', '').split('.')[0];
-      return domain.charAt(0).toUpperCase() + domain.slice(1);
-    } catch (err) {
-      return 'Unknown';
-    }
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,6 +45,37 @@ const QRCodeGenerator = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
     setSuccess(false);
+  };
+
+  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setOtp(e.target.value);
+    setError('');
+  };
+
+  const sendOtp = async () => {
+    if (!validateEmail(formData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await axios.post(`${apiUrl}/api/send-otp`, {
+        email: formData.email
+      });
+
+      if (response.data.success) {
+        setOtpSent(true);
+      } else {
+        throw new Error(response.data.error || 'Failed to send OTP');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const generateQRCode = async (e: React.FormEvent) => {
@@ -69,33 +89,8 @@ const QRCodeGenerator = () => {
         throw new Error('Please connect your wallet first');
       }
 
-      if (!apiUrl) {
-        throw new Error('API URL not configured');
-      }
-
-      // Validate input data
-      if (!formData.website_url) {
-        throw new Error('Website URL is required');
-      }
-
-      let websiteUrl = formData.website_url;
-      try {
-        const url = new URL(websiteUrl);
-        // Remove www. from the URL to maintain consistency
-        websiteUrl = url.protocol + '//' + url.hostname.replace(/^www\./, '') + url.pathname + url.search;
-        
-        // Validate URL format
-        if (!url.protocol || !url.hostname) {
-          throw new Error('Invalid URL format');
-        }
-        
-        // Check for valid TLD
-        const tld = url.hostname.split('.').pop();
-        if (!tld || tld.length < 2) {
-          throw new Error('Invalid domain name');
-        }
-      } catch (err) {
-        throw new Error('Please enter a valid website URL (e.g., https://example.com)');
+      if (!validateEmail(formData.email)) {
+        throw new Error('Please enter a valid email address');
       }
 
       if (!formData.memo.trim()) {
@@ -110,170 +105,59 @@ const QRCodeGenerator = () => {
         throw new Error('Please enter a valid amount');
       }
 
-      const websiteName = extractWebsiteName(websiteUrl);
-      const paymentData = {
-        wallet_address: user.wallet.address,
-        website_url: websiteUrl, // Use the normalized URL
-        website_name: websiteName,
-        memo: formData.memo.trim(),
-        amount: formData.amount || '0',
-        qr_data: user.wallet.address
+      // Initialize ethers provider and USDC contract
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const usdcContract = new ethers.Contract(USDC_CONTRACT_ADDRESS, USDC_ABI, signer);
+
+      // Convert 0.30 USDC to the correct decimal places (USDC has 6 decimals)
+      const amount = ethers.parseUnits("0.30", 6);
+
+      // Send 0.30 USDC payment
+      setPaymentStatus('processing');
+      const tx = await usdcContract.transfer(adminWallet, amount);
+      await tx.wait(); // Wait for transaction confirmation
+      setPaymentStatus('completed');
+
+      const emailName = formData.email.split('@')[0];
+      const qrData = {
+        wallet: user.wallet.address,
+        scanUrl: `${apiUrl}/api/qr-scan/${encodeURIComponent(formData.email)}`
       };
 
-      // Validate data constraints
-      if (paymentData.website_url.length > 255) {
-        throw new Error('Website URL is too long (maximum 255 characters)');
-      }
+      const paymentData = {
+        wallet_address: user.wallet.address,
+        email: formData.email,
+        email_name: emailName,
+        memo: formData.memo.trim(),
+        amount: formData.amount || '0',
+        qr_data: JSON.stringify(qrData),
+        otp: otp
+      };
 
-      if (paymentData.website_name.length > 50) {
-        throw new Error('Website name is too long (maximum 50 characters)');
-      }
+      console.log('Sending request to:', `${apiUrl}/api/qr-codes`); // Debug log
+      console.log('Payment data:', paymentData); // Debug log
 
-      if (!paymentData.wallet_address.match(/^0x[a-fA-F0-9]{40}$/)) {
-        throw new Error('Invalid wallet address format');
-      }
-
-      // Log the exact data being sent
-      console.log('Sending exact data to API:', {
-        url: `${apiUrl}/api/qr-codes`,
-        method: 'POST',
-        data: paymentData,
-        validation: {
-          walletAddressValid: /^0x[a-fA-F0-9]{40}$/.test(paymentData.wallet_address),
-          websiteUrlNormalized: websiteUrl === paymentData.website_url,
-          websiteNameValid: websiteName === paymentData.website_name,
-          memoValid: paymentData.memo.length > 0 && paymentData.memo.length <= 100,
-          amountValid: !isNaN(Number(paymentData.amount)) && Number(paymentData.amount) >= 0
+      const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData, {
+        headers: {
+          'Content-Type': 'application/json',
         }
       });
 
-      const maxRetries = 2;
-      let retryCount = 0;
-      let lastError = null;
-
-      while (retryCount <= maxRetries) {
-        try {
-          const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData, {
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Client-Version': '1.0.0',
-              'X-Request-Time': new Date().toISOString(),
-              'Origin': window.location.origin,
-              'X-Debug-Info': 'frontend-retry-' + retryCount
-            },
-            withCredentials: true,
-            timeout: 15000 // Increased timeout to 15 seconds
-          });
-          
-          console.log('Successful API Response:', {
-            status: response.status,
-            data: response.data,
-            headers: response.headers
-          });
-          
-          if (!response.data) {
-            throw new Error('Empty response from server');
-          }
-
-          if (!response.data.qr_data) {
-            throw new Error('Missing QR data in response');
-          }
-
-          setQRData(response.data.qr_data);
-          setSuccess(true);
-          return;
-        } catch (err: any) {
-          lastError = err;
-          const errorDetails = {
-            message: err.message,
-            status: err.response?.status,
-            statusText: err.response?.statusText,
-            data: err.response?.data,
-            config: {
-              url: err.config?.url,
-              method: err.config?.method,
-              data: JSON.parse(err.config?.data || '{}'),
-              headers: err.config?.headers
-            }
-          };
-          
-          console.error(`Request attempt ${retryCount + 1} failed:`, errorDetails);
-          
-          // Check for specific error conditions
-          if (err.response?.data?.error === 'Failed to create QR code entry') {
-            console.error('Database insertion failed. Checking data validity:', {
-              hasWalletAddress: !!paymentData.wallet_address,
-              walletAddressFormat: /^0x[a-fA-F0-9]{40}$/.test(paymentData.wallet_address),
-              websiteUrlValid: paymentData.website_url.startsWith('http'),
-              websiteUrlLength: paymentData.website_url.length,
-              websiteNameLength: paymentData.website_name.length,
-              memoPresent: !!paymentData.memo,
-              memoLength: paymentData.memo.length,
-              amountValid: !isNaN(Number(paymentData.amount)),
-              qrDataValid: paymentData.qr_data === paymentData.wallet_address
-            });
-
-            // Check for potential duplicate entry
-            try {
-              const existingCheck = await axios.get(
-                `${apiUrl}/api/qr-codes/${paymentData.wallet_address}/${encodeURIComponent(paymentData.website_url)}`,
-                { timeout: 5000 }
-              );
-              if (existingCheck.data) {
-                throw new Error('A QR code already exists for this website');
-              }
-            } catch (checkErr: any) {
-              if (checkErr.response?.status !== 404) {
-                console.error('Error checking for existing QR code:', checkErr);
-              }
-            }
-          }
-
-          if (err.response?.status === 500) {
-            retryCount++;
-            if (retryCount <= maxRetries) {
-              const delay = 1000 * retryCount;
-              console.log(`Retrying in ${delay}ms... Attempt ${retryCount} of ${maxRetries}`);
-              await new Promise(resolve => setTimeout(resolve, delay));
-              continue;
-            }
-          }
-          break;
-        }
+      if (!response.data) {
+        throw new Error('Empty response from server');
       }
 
-      throw lastError;
+      if (!response.data.qr_data) {
+        throw new Error('Missing QR data in response');
+      }
+
+      setQRData(JSON.stringify(qrData));
+      setSuccess(true);
     } catch (err: any) {
-      console.error('All attempts failed. Final error details:', {
-        message: err.message,
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-        config: err.config ? {
-          url: err.config.url,
-          method: err.config.method,
-          data: JSON.parse(err.config.data || '{}'),
-          headers: err.config.headers
-        } : 'No config available'
-      });
-      
-      let errorMessage = 'Failed to generate QR code. Please try again.';
-      
-      if (err.response?.data?.error === 'Failed to create QR code entry') {
-        errorMessage = 'Unable to save QR code. This could be due to:\n' +
-          '• A QR code already exists for this website\n' +
-          '• Invalid website URL format\n' +
-          '• Database connection issues\n\n' +
-          'Please try again with a different website URL or contact support if the issue persists.';
-      } else if (err.response?.status === 500) {
-        errorMessage = 'Server error. Please try again in a few moments.';
-      } else if (err.response?.data?.error) {
-        errorMessage = err.response.data.error;
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
+      console.error('Error:', err);
+      setPaymentStatus('failed');
+      setError(err.response?.data?.error || err.message || 'Failed to generate QR code');
     } finally {
       setLoading(false);
     }
@@ -294,8 +178,8 @@ const QRCodeGenerator = () => {
       ctx?.drawImage(img, 0, 0);
       const pngFile = canvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
-      const websiteName = extractWebsiteName(formData.website_url);
-      downloadLink.download = `${websiteName.toLowerCase()}-qr.png`;
+      const emailName = formData.email.split('@')[0];
+      downloadLink.download = `${emailName}-qr.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
     };
@@ -311,20 +195,56 @@ const QRCodeGenerator = () => {
             <form onSubmit={generateQRCode} className="space-y-6 w-full">
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="website_url" className="block text-sm font-medium text-gray-300">
-                    Website URL
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-300">
+                    Email Address
                   </label>
-                  <input
-                    type="url"
-                    id="website_url"
-                    name="website_url"
-                    required
-                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                    value={formData.website_url}
-                    onChange={handleInputChange}
-                    placeholder="https://example.com"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      required
+                      className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="your.email@example.com"
+                      disabled={otpSent}
+                    />
+                    {!otpSent && (
+                      <button
+                        type="button"
+                        onClick={sendOtp}
+                        disabled={loading || !validateEmail(formData.email)}
+                        className={`mt-1 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                          loading || !validateEmail(formData.email)
+                            ? 'bg-gray-600 cursor-not-allowed'
+                            : 'bg-orange-600 hover:bg-orange-700 text-white'
+                        }`}
+                      >
+                        Send OTP
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {otpSent && (
+                  <div>
+                    <label htmlFor="otp" className="block text-sm font-medium text-gray-300">
+                      Enter OTP
+                    </label>
+                    <input
+                      type="text"
+                      id="otp"
+                      name="otp"
+                      required
+                      maxLength={6}
+                      className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
+                      value={otp}
+                      onChange={handleOtpChange}
+                      placeholder="Enter 6-digit OTP"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor="memo" className="block text-sm font-medium text-gray-300">
@@ -335,7 +255,7 @@ const QRCodeGenerator = () => {
                     id="memo"
                     name="memo"
                     required
-                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
                     value={formData.memo}
                     onChange={handleInputChange}
                     placeholder="Payment for services"
@@ -352,7 +272,7 @@ const QRCodeGenerator = () => {
                     name="amount"
                     step="0.01"
                     min="0"
-                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
                     value={formData.amount}
                     onChange={handleInputChange}
                     placeholder="0.00"
@@ -362,11 +282,11 @@ const QRCodeGenerator = () => {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !otpSent || !otp}
                 className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 ${
-                  loading
+                  loading || !otpSent || !otp
                     ? 'bg-gray-600 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-orange-600 hover:bg-orange-700 text-white'
                 }`}
               >
                 {loading ? (
@@ -386,10 +306,10 @@ const QRCodeGenerator = () => {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    Generating...
+                    {paymentStatus === 'processing' ? 'Processing Payment...' : 'Generating...'}
                   </span>
                 ) : (
-                  'Generate QR Code'
+                  'Generate QR Code (0.30 USDC)'
                 )}
               </button>
 
@@ -412,7 +332,7 @@ const QRCodeGenerator = () => {
               <div className="text-center animate-fadeIn">
                 <div className="bg-white p-6 rounded-lg shadow-lg inline-block mb-4">
                   <div className="text-gray-800 font-medium mb-2">
-                    {extractWebsiteName(formData.website_url)} USDC Payment Address
+                    {formData.email.split('@')[0]} USDC Payment Address
                   </div>
                   <QRCodeSVG 
                     id="qr-code-svg"

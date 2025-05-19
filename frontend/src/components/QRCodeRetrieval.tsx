@@ -6,39 +6,35 @@ import { ethers } from 'ethers';
 
 // USDC contract ABI (only transfer function needed)
 const USDC_ABI = [
-  "function transfer(address to, uint256 amount) returns (bool)"
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function balanceOf(address account) view returns (uint256)"
 ];
 
 // Base Mainnet USDC contract address
 const USDC_CONTRACT_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 interface RetrievalFormData {
-  website_url: string;
+  email: string;
 }
 
 const QRCodeRetrieval = () => {
   const { user } = usePrivy();
   const apiUrl = import.meta.env.VITE_API_URL;
   const adminWallet = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
-  const [formData, setFormData] = useState<RetrievalFormData>({ website_url: '' });
+  const [formData, setFormData] = useState<RetrievalFormData>({ email: '' });
   const [qrData, setQRData] = useState<any>(null);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
 
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError('');
-  };
-
-  const normalizeUrl = (url: string): string => {
-    try {
-      const urlObj = new URL(url);
-      // Remove www. from the URL to maintain consistency
-      return urlObj.protocol + '//' + urlObj.hostname.replace(/^www\./, '') + urlObj.pathname + urlObj.search;
-    } catch (err) {
-      throw new Error('Please enter a valid website URL (e.g., https://example.com)');
-    }
   };
 
   const payFeeAndRetrieveQR = async (e: React.FormEvent) => {
@@ -58,28 +54,8 @@ const QRCodeRetrieval = () => {
     setPaymentStatus('processing');
 
     try {
-      // Validate and normalize the URL
-      if (!formData.website_url) {
-        throw new Error('Website URL is required');
-      }
-
-      let websiteUrl;
-      try {
-        websiteUrl = normalizeUrl(formData.website_url);
-        
-        // Validate URL format
-        const url = new URL(websiteUrl);
-        if (!url.protocol || !url.hostname) {
-          throw new Error('Invalid URL format');
-        }
-        
-        // Check for valid TLD
-        const tld = url.hostname.split('.').pop();
-        if (!tld || tld.length < 2) {
-          throw new Error('Invalid domain name');
-        }
-      } catch (err) {
-        throw new Error('Please enter a valid website URL (e.g., https://example.com)');
+      if (!validateEmail(formData.email)) {
+        throw new Error('Please enter a valid email address');
       }
 
       // Initialize ethers provider and USDC contract
@@ -98,7 +74,7 @@ const QRCodeRetrieval = () => {
 
       // After payment confirmation, retrieve the QR code
       const response = await axios.get(
-        `${apiUrl}/api/qr-codes/${user.wallet.address}/${encodeURIComponent(websiteUrl)}`,
+        `${apiUrl}/api/qr-codes/${encodeURIComponent(formData.email)}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -137,7 +113,7 @@ const QRCodeRetrieval = () => {
       ctx?.drawImage(img, 0, 0);
       const pngFile = canvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
-      downloadLink.download = `${qrData.website_name.toLowerCase()}-qr.png`;
+      downloadLink.download = `${qrData.email_name}-qr.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
     };
@@ -152,36 +128,38 @@ const QRCodeRetrieval = () => {
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-white mb-6">Retrieve Your QR Code</h2>
             <p className="text-gray-400 mb-6">
-              Enter the website URL to retrieve your existing QR code. A fee of 1 USDC will be charged.
+              Enter the email address to retrieve your existing QR code. A fee of 1 USDC will be charged.
             </p>
             
-            <form onSubmit={payFeeAndRetrieveQR} className="space-y-6">
-              <div>
-                <label htmlFor="website_url" className="block text-sm font-medium text-gray-300">
-                  Website URL
-                </label>
-                <input
-                  type="url"
-                  id="website_url"
-                  name="website_url"
-                  required
-                  className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                  value={formData.website_url}
-                  onChange={handleInputChange}
-                  placeholder="https://example.com"
-                />
+            <form onSubmit={payFeeAndRetrieveQR} className="space-y-6 w-full">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-300">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    required
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="your.email@example.com"
+                  />
+                </div>
               </div>
 
               <button
                 type="submit"
-                disabled={loading || paymentStatus === 'processing'}
+                disabled={loading || !validateEmail(formData.email)}
                 className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 ${
-                  loading || paymentStatus === 'processing'
+                  loading || !validateEmail(formData.email)
                     ? 'bg-gray-600 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-orange-600 hover:bg-orange-700 text-white'
                 }`}
               >
-                {loading || paymentStatus === 'processing' ? (
+                {loading ? (
                   <span className="flex items-center justify-center gap-2">
                     <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
                       <circle
@@ -201,12 +179,12 @@ const QRCodeRetrieval = () => {
                     {paymentStatus === 'processing' ? 'Processing Payment...' : 'Retrieving...'}
                   </span>
                 ) : (
-                  'Pay 1 USDC & Retrieve QR Code'
+                  'Retrieve QR Code (1 USDC)'
                 )}
               </button>
 
               {error && (
-                <div className="text-red-400 text-sm bg-red-900/20 p-3 rounded-lg">
+                <div className="text-red-400 text-sm bg-red-900/20 p-3 rounded-lg animate-fadeIn">
                   {error}
                 </div>
               )}
@@ -218,7 +196,7 @@ const QRCodeRetrieval = () => {
               <div className="text-center animate-fadeIn">
                 <div className="bg-white p-6 rounded-lg shadow-lg inline-block mb-4">
                   <div className="text-gray-800 font-medium mb-2">
-                    {qrData.website_name} USDC Payment Address
+                    {qrData.email_name} USDC Payment Address
                   </div>
                   <QRCodeSVG
                     id="retrieved-qr-code-svg"
@@ -249,7 +227,7 @@ const QRCodeRetrieval = () => {
                 <svg className="w-32 h-32 mx-auto mb-4 opacity-50" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M3 3h6v6H3V3zm2 2v2h2V5H5zm8-2h6v6h-6V3zm2 2v2h2V5h-2zm-8 6h6v6H7v-6zm2 2v2h2v-2H9zm-6 4h4v2H3v-2zm14-4h2v4h-2v-4zm0 6h4v2h-4v-2zM19 7h2v2h-2V7zm-6 8h2v2h-2v-2zm2 4h2v2h-2v-2z"/>
                 </svg>
-                <p className="text-lg">Enter website URL and pay 1 USDC to retrieve your QR code</p>
+                <p className="text-lg">Enter an email address to retrieve a QR code</p>
               </div>
             )}
           </div>
