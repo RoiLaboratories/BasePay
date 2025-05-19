@@ -116,7 +116,8 @@ const QRCodeGenerator = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        withCredentials: true
+        withCredentials: true,
+        timeout: 30000, // 30 second timeout
       });
 
       if (!response.data) {
@@ -128,13 +129,15 @@ const QRCodeGenerator = () => {
     } catch (err: any) {
       console.error('Error:', err);
       setPaymentStatus('failed');
-      if (err.response) {
+      if (err.code === 'ECONNABORTED') {
+        setError('Request timed out. Please try again.');
+      } else if (err.response) {
         console.error('Response data:', err.response.data);
         console.error('Response status:', err.response.status);
         setError(err.response.data?.error || 'Failed to generate QR code');
       } else if (err.request) {
         console.error('No response received:', err.request);
-        setError('No response from server. Please try again.');
+        setError('Server is not responding. Please try again later.');
       } else {
         setError(err.message || 'Failed to generate QR code');
       }
