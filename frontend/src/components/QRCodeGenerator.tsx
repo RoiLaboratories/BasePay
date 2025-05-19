@@ -129,8 +129,9 @@ const QRCodeGenerator = () => {
         throw new Error('Empty response from server');
       }
 
-      // Set QR data directly from the response
-      setQRData(response.data.qr_data || JSON.stringify(qrData));
+      // Parse the QR data from the response
+      const qrDataObj = JSON.parse(response.data.qr_data);
+      setQRData(qrDataObj.scanUrl);
       setSuccess(true);
     } catch (err: any) {
       console.error('Error:', err);
@@ -291,7 +292,7 @@ const QRCodeGenerator = () => {
                   </div>
                   <QRCodeSVG 
                     id="qr-code-svg"
-                    value={user?.wallet?.address || ''}
+                    value={qrData}
                     size={256} 
                     level="H"
                     includeMargin={true}
