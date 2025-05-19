@@ -86,8 +86,15 @@ const QRCodeGenerator = () => {
 
       const emailName = formData.email.split('@')[0];
       const qrData = {
+        // For wallet apps - just the address
         wallet: user.wallet.address,
-        scanUrl: `${apiUrl}/api/qr-scan/${encodeURIComponent(formData.email)}`
+        // For regular scanners - human readable format
+        display: [
+          `USDC Payment Address: ${user.wallet.address}`,
+          `Memo: ${formData.memo.trim()}`,
+          formData.amount ? `Amount: ${formData.amount} USDC` : null,
+          `Scan URL: ${apiUrl}/api/qr-scan/${encodeURIComponent(formData.email)}`
+        ].filter(Boolean).join('\n')
       };
 
       const paymentData = {
