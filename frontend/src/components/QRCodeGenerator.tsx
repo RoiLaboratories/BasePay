@@ -18,7 +18,7 @@ interface QRFormData {
 
 const QRCodeGenerator = () => {
   const { user } = usePrivy();
-  const apiUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, ''); // Remove trailing slash if present
+  const apiUrl = 'https://basepay-api.vercel.app'; // Hardcode the correct API URL
   const adminWallet = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
 
   console.log('Environment Variables:', {
