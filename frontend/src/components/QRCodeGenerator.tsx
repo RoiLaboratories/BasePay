@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { QRCodeSVG } from 'qrcode.react';
 import axios from 'axios';
+import { parseUnits } from 'viem';
+import { USDC_ABI } from '../constants/abi';
+import { USDC_CONTRACT_ADDRESS } from '../constants/addresses';
 
 interface QRFormData {
   email: string;
@@ -10,9 +13,10 @@ interface QRFormData {
 }
 
 const QRCodeGenerator = () => {
-  const { user } = usePrivy();
+  const { user, sendTransaction } = usePrivy();
   const apiUrl = 'https://basepay-api.vercel.app'; // Hardcode the correct API URL
   const adminWallet = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
+  const GENERATION_FEE = '0.30'; // USDC fee for QR code generation
 
   console.log('Environment Variables:', {
     apiUrl,
@@ -67,6 +71,17 @@ const QRCodeGenerator = () => {
 
       if (formData.amount && (isNaN(Number(formData.amount)) || Number(formData.amount) < 0)) {
         throw new Error('Please enter a valid amount');
+      }
+
+      // Send the generation fee to admin wallet using USDC
+      const feeAmount = parseUnits(GENERATION_FEE, 6); // USDC has 6 decimals
+      const tx = await sendTransaction({
+        to: USDC_CONTRACT_ADDRESS,
+        data: USDC_ABI.encodeFunctionData('transfer', [adminWallet, feeAmount]),
+      });
+
+      if (!tx) {
+        throw new Error('Failed to send generation fee');
       }
 
       const emailName = formData.email.split('@')[0];
@@ -128,9 +143,37 @@ const QRCodeGenerator = () => {
     const img = new Image();
 
     img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx?.drawImage(img, 0, 0);
+      // Set canvas size to accommodate QR code and text
+      canvas.width = 512;
+      canvas.height = 512;
+      
+      // Fill white background
+      ctx!.fillStyle = 'white';
+      ctx!.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw QR code
+      ctx!.drawImage(img, 128, 64, 256, 256);
+      
+      // Add text
+      ctx!.fillStyle = '#1F2937';
+      ctx!.font = 'bold 24px Arial';
+      ctx!.textAlign = 'center';
+      ctx!.fillText(`${formData.email.split('@')[0]} USDC Payment Address`, canvas.width/2, 40);
+      
+      ctx!.font = '16px Arial';
+      ctx!.fillText('Scan to pay with USDC on Base', canvas.width/2, 340);
+      
+      if (formData.amount) {
+        ctx!.fillText(`Requested Amount: ${formData.amount} USDC`, canvas.width/2, 370);
+      }
+      
+      ctx!.fillText('Generation Fee: 0.30 USDC', canvas.width/2, 400);
+      
+      // Add wallet address
+      ctx!.font = '14px monospace';
+      ctx!.fillText(user?.wallet?.address || '', canvas.width/2, 440);
+
+      // Convert to PNG and download
       const pngFile = canvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
       const emailName = formData.email.split('@')[0];
@@ -183,7 +226,7 @@ const QRCodeGenerator = () => {
 
                 <div>
                   <label htmlFor="amount" className="block text-sm font-medium text-gray-300">
-                    Amount (USDC) Optional
+                    Amount (USDC) - Optional
                   </label>
                   <input
                     type="number"
@@ -196,6 +239,15 @@ const QRCodeGenerator = () => {
                     onChange={handleInputChange}
                     placeholder="0.00"
                   />
+                  <p className="mt-1 text-sm text-gray-400">
+                    This is the amount that will be requested when someone scans the QR code. Leave empty for no specific amount.
+                  </p>
+                </div>
+
+                <div className="bg-gray-700/50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-300">
+                    QR Code Generation Fee: 0.30 USDC
+                  </p>
                 </div>
               </div>
 
@@ -262,6 +314,14 @@ const QRCodeGenerator = () => {
                   />
                   <div className="text-gray-600 text-sm mt-2">
                     Scan to pay with USDC on Base
+                  </div>
+                  {formData.amount && (
+                    <div className="text-gray-600 text-sm mt-1">
+                      Requested Amount: {formData.amount} USDC
+                    </div>
+                  )}
+                  <div className="text-gray-600 text-sm mt-1">
+                    Generation Fee: 0.30 USDC
                   </div>
                 </div>
                 <div className="mb-4 text-gray-300">
