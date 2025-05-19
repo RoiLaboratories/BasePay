@@ -18,7 +18,7 @@ interface QRFormData {
 
 const QRCodeGenerator = () => {
   const { user } = usePrivy();
-  const apiUrl = import.meta.env.VITE_API_URL;
+  const apiUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, ''); // Remove trailing slash if present
   const adminWallet = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
 
   console.log('Environment Variables:', {
@@ -92,10 +92,10 @@ const QRCodeGenerator = () => {
       const signer = await provider.getSigner();
       const usdcContract = new ethers.Contract(USDC_CONTRACT_ADDRESS, USDC_ABI, signer);
 
-      // Convert 0.05 USDC to the correct decimal places (USDC has 6 decimals)
-      const amount = ethers.parseUnits("0.05", 6);
+      // Convert 0.001 USDC to the correct decimal places (USDC has 6 decimals)
+      const amount = ethers.parseUnits("0.001", 6);
 
-      // Send 0.05 USDC payment
+      // Send 0.001 USDC payment
       setPaymentStatus('processing');
       const tx = await usdcContract.transfer(adminWallet, amount);
       await tx.wait(); // Wait for transaction confirmation
@@ -265,7 +265,7 @@ const QRCodeGenerator = () => {
                     {paymentStatus === 'processing' ? 'Processing Payment...' : 'Generating...'}
                   </span>
                 ) : (
-                  'Generate QR Code (0.30 USDC)'
+                  'Generate QR Code (0.001 USDC)'
                 )}
               </button>
 
