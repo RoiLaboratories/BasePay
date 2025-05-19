@@ -2,13 +2,6 @@ import { useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { QRCodeSVG } from 'qrcode.react';
 import axios from 'axios';
-import { ethers } from 'ethers';
-
-const USDC_CONTRACT_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base Mainnet USDC
-const USDC_ABI = [
-  "function transfer(address to, uint256 amount) returns (bool)",
-  "function balanceOf(address account) view returns (uint256)"
-];
 
 interface QRFormData {
   email: string;
@@ -36,7 +29,6 @@ const QRCodeGenerator = () => {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -61,16 +53,6 @@ const QRCodeGenerator = () => {
         throw new Error('Please connect your wallet first');
       }
 
-      if (!adminWallet || adminWallet.trim() === '') {
-        console.error('Admin wallet is missing or empty:', adminWallet);
-        throw new Error('Admin wallet not configured properly');
-      }
-
-      if (!ethers.isAddress(adminWallet)) {
-        console.error('Invalid admin wallet address:', adminWallet);
-        throw new Error('Invalid admin wallet address format');
-      }
-
       if (!validateEmail(formData.email)) {
         throw new Error('Please enter a valid email address');
       }
@@ -86,27 +68,6 @@ const QRCodeGenerator = () => {
       if (formData.amount && (isNaN(Number(formData.amount)) || Number(formData.amount) < 0)) {
         throw new Error('Please enter a valid amount');
       }
-
-      // Initialize ethers provider and USDC contract
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const usdcContract = new ethers.Contract(USDC_CONTRACT_ADDRESS, USDC_ABI, signer);
-
-      // Convert 0.0001 USDC to the correct decimal places (USDC has 6 decimals)
-      const amount = ethers.parseUnits("0.0001", 6);
-
-      // Send USDC payment
-      setPaymentStatus('processing');
-      const tx = await usdcContract.transfer(adminWallet, amount, {
-        gasLimit: 100000 // Add explicit gas limit
-      });
-      
-      // Wait for transaction confirmation
-      const receipt = await tx.wait();
-      if (!receipt.status) {
-        throw new Error('Transaction failed');
-      }
-      setPaymentStatus('completed');
 
       const emailName = formData.email.split('@')[0];
       const qrData = {
@@ -141,19 +102,14 @@ const QRCodeGenerator = () => {
       setSuccess(true);
     } catch (err: any) {
       console.error('Error:', err);
-      setPaymentStatus('failed');
       if (err.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
         console.error('Response data:', err.response.data);
         console.error('Response status:', err.response.status);
         setError(err.response.data?.error || 'Failed to generate QR code');
       } else if (err.request) {
-        // The request was made but no response was received
         console.error('No response received:', err.request);
         setError('No response from server. Please try again.');
       } else {
-        // Something happened in setting up the request that triggered an Error
         setError(err.message || 'Failed to generate QR code');
       }
     } finally {
@@ -268,10 +224,10 @@ const QRCodeGenerator = () => {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    {paymentStatus === 'processing' ? 'Processing Payment...' : 'Generating...'}
+                    Generating...
                   </span>
                 ) : (
-                  'Generate QR Code (0.0001 USDC)'
+                  'Generate QR Code'
                 )}
               </button>
 
