@@ -2,9 +2,16 @@ import { useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { QRCodeSVG } from 'qrcode.react';
 import axios from 'axios';
-import { parseUnits } from 'viem';
-import { USDC_ABI } from '../constants/abi';
-import { USDC_CONTRACT_ADDRESS } from '../constants/addresses';
+import { ethers } from 'ethers';
+
+// USDC contract ABI (only transfer function needed)
+const USDC_ABI = [
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function balanceOf(address account) view returns (uint256)"
+];
+
+// Base Mainnet USDC contract address
+const USDC_CONTRACT_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 interface QRFormData {
   email: string;
@@ -13,7 +20,7 @@ interface QRFormData {
 }
 
 const QRCodeGenerator = () => {
-  const { user, sendTransaction } = usePrivy();
+  const { user } = usePrivy();
   const apiUrl = 'https://basepay-api.vercel.app';
   const adminWallet = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
   const GENERATION_FEE = '0.30'; // USDC fee for QR code generation
@@ -27,6 +34,7 @@ const QRCodeGenerator = () => {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -45,6 +53,7 @@ const QRCodeGenerator = () => {
     setError('');
     setLoading(true);
     setSuccess(false);
+    setPaymentStatus('processing');
 
     try {
       if (!user?.wallet?.address) {
@@ -67,16 +76,19 @@ const QRCodeGenerator = () => {
         throw new Error('Please enter a valid amount');
       }
 
-      // Send the generation fee to admin wallet using USDC
-      const feeAmount = parseUnits(GENERATION_FEE, 6); // USDC has 6 decimals
-      const tx = await sendTransaction({
-        to: USDC_CONTRACT_ADDRESS,
-        data: USDC_ABI.encodeFunctionData('transfer', [adminWallet, feeAmount]),
-      });
+      // Initialize ethers provider and USDC contract
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const usdcContract = new ethers.Contract(USDC_CONTRACT_ADDRESS, USDC_ABI, signer);
 
-      if (!tx) {
-        throw new Error('Failed to send generation fee');
-      }
+      // Convert fee to the correct decimal places (USDC has 6 decimals)
+      const feeAmount = ethers.parseUnits(GENERATION_FEE, 6);
+
+      // Send USDC payment
+      const tx = await usdcContract.transfer(adminWallet, feeAmount);
+      await tx.wait(); // Wait for transaction confirmation
+
+      setPaymentStatus('completed');
 
       const emailName = formData.email.split('@')[0];
       const qrData = {
@@ -115,6 +127,7 @@ const QRCodeGenerator = () => {
       setSuccess(true);
     } catch (err: any) {
       console.error('Error:', err);
+      setPaymentStatus('failed');
       if (err.response) {
         console.error('Response data:', err.response.data);
         console.error('Response status:', err.response.status);
@@ -274,7 +287,7 @@ const QRCodeGenerator = () => {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    Generating...
+                    {paymentStatus === 'processing' ? 'Processing Payment...' : 'Generating QR Code...'}
                   </span>
                 ) : (
                   'Generate QR Code'
