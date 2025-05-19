@@ -129,9 +129,8 @@ const QRCodeGenerator = () => {
         throw new Error('Empty response from server');
       }
 
-      // Parse the QR data from the response
-      const qrDataObj = JSON.parse(response.data.qr_data);
-      setQRData(qrDataObj.scanUrl);
+      // Set QR data directly from the response
+      setQRData(response.data.qr_data);
       setSuccess(true);
     } catch (err: any) {
       console.error('Error:', err);
