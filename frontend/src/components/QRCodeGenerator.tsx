@@ -93,12 +93,6 @@ const QRCodeGenerator = () => {
 
       const emailName = formData.email.split('@')[0];
       const qrData = user.wallet.address; // QR code value is just the wallet address
-      const display = [
-        `USDC Payment Address: ${user.wallet.address}`,
-        `Memo: ${formData.memo.trim()}`,
-        formData.amount ? `Amount: ${formData.amount} USDC` : null,
-        `Scan URL: ${apiUrl}/api/qr-scan/${encodeURIComponent(formData.email)}`
-      ].filter(Boolean).join('\n');
 
       const paymentData = {
         wallet_address: user.wallet.address,
@@ -170,7 +164,7 @@ const QRCodeGenerator = () => {
       ctx!.fillStyle = '#FF7300';
       ctx!.font = 'bold 32px Arial';
       ctx!.textAlign = 'center';
-      ctx!.fillText(`${displayData?.emailName || ''} USDC Payment`, canvas.width/2, 60);
+      ctx!.fillText(`${displayData?.emailName || ''} USDC Payment address`, canvas.width/2, 60);
 
       // Subtitle
       ctx!.fillStyle = '#222';
@@ -198,24 +192,24 @@ const QRCodeGenerator = () => {
       }
 
       // Fee
-      ctx!.fillStyle = '#888';
-      ctx!.font = '16px Arial';
-      ctx!.fillText('QR Generation Fee: 0.30 USDC', canvas.width/2, 480);
+      // ctx!.fillStyle = '#888';
+      // ctx!.font = '16px Arial';
+      // ctx!.fillText('QR Generation Fee: 0.30 USDC', canvas.width/2, 480);
 
       // Wallet address
       ctx!.fillStyle = '#222';
       ctx!.font = '16px monospace';
       ctx!.fillText(displayData?.wallet || '', canvas.width/2, 520);
 
-      // Scan URL
-      ctx!.fillStyle = '#444';
-      ctx!.font = '14px Arial';
-      ctx!.fillText(displayData?.scanUrl || '', canvas.width/2, 560);
+      // // Scan URL
+      // ctx!.fillStyle = '#444';
+      // ctx!.font = '14px Arial';
+      // ctx!.fillText(displayData?.scanUrl || '', canvas.width/2, 560);
 
       // Branding
       ctx!.fillStyle = '#FF7300';
       ctx!.font = 'bold 18px Arial';
-      ctx!.fillText('Powered by BasePayQR', canvas.width/2, 780);
+      ctx!.fillText('Powered by RoiLabs', canvas.width/2, 780);
 
       // Download
       const pngFile = canvas.toDataURL('image/png');
