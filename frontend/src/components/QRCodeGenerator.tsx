@@ -229,7 +229,7 @@ const QRCodeGenerator = () => {
       const pngFile = canvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
       const emailName = displayData?.emailName || 'qr';
-      downloadLink.download = `${emailName}-basepayqr.png`;
+      downloadLink.download = `${emailName}-qrmint.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
     };
@@ -365,7 +365,7 @@ const QRCodeGenerator = () => {
                     includeMargin={true}
                   />
                   <div className="text-gray-600 text-sm mt-2">
-                    Scan to pay with USDC on Base
+                    Your unique QR code for on-chain payments
                   </div>
                   {displayData?.amount && (
                     <div className="text-gray-600 text-sm mt-1">
@@ -373,7 +373,7 @@ const QRCodeGenerator = () => {
                     </div>
                   )}
                   <div className="text-gray-600 text-sm mt-1">
-                    Generation Fee: 0.30 USDC
+                    {/* Generation Fee: 0.30 USDC */}
                   </div>
                 </div>
                 <div className="mb-4 text-gray-300">

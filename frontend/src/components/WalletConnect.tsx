@@ -54,9 +54,9 @@ const WalletConnect = () => {
     return (
       <div className="flex flex-col items-center justify-center space-y-6">
         <div className="text-center space-y-4">
-          <h2 className="text-3xl font-bold text-white">Welcome to BasePayQR</h2>
+          <h2 className="text-3xl font-bold text-white">Welcome to QRmint</h2>
           <p className="text-gray-400 max-w-md">
-            Connect your wallet to generate QR codes for Base USDC payments
+            Connect your wallet to generate QR codes for onchain payments
           </p>
         </div>
         <button
