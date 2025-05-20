@@ -35,6 +35,7 @@ const QRCodeGenerator = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
+  const [displayData, setDisplayData] = useState<any>(null); // For human-readable info
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -91,17 +92,13 @@ const QRCodeGenerator = () => {
       setPaymentStatus('completed');
 
       const emailName = formData.email.split('@')[0];
-      const qrData = {
-        // For wallet apps - just the address
-        wallet: user.wallet.address,
-        // For regular scanners - human readable format
-        display: [
-          `USDC Payment Address: ${user.wallet.address}`,
-          `Memo: ${formData.memo.trim()}`,
-          formData.amount ? `Amount: ${formData.amount} USDC` : null,
-          `Scan URL: ${apiUrl}/api/qr-scan/${encodeURIComponent(formData.email)}`
-        ].filter(Boolean).join('\n')
-      };
+      const qrData = user.wallet.address; // QR code value is just the wallet address
+      const display = [
+        `USDC Payment Address: ${user.wallet.address}`,
+        `Memo: ${formData.memo.trim()}`,
+        formData.amount ? `Amount: ${formData.amount} USDC` : null,
+        `Scan URL: ${apiUrl}/api/qr-scan/${encodeURIComponent(formData.email)}`
+      ].filter(Boolean).join('\n');
 
       const paymentData = {
         wallet_address: user.wallet.address,
@@ -109,7 +106,7 @@ const QRCodeGenerator = () => {
         email_name: emailName,
         memo: formData.memo.trim(),
         amount: formData.amount || '0',
-        qr_data: JSON.stringify(qrData)
+        qr_data: qrData // Only wallet address
       };
 
       const response = await axios.post(`${apiUrl}/api/qr-codes`, paymentData, {
@@ -124,7 +121,14 @@ const QRCodeGenerator = () => {
         throw new Error('Empty response from server');
       }
 
-      setQRData(response.data.qr_data);
+      setQRData(qrData); // Only wallet address
+      setDisplayData({
+        emailName,
+        wallet: user.wallet.address,
+        memo: formData.memo.trim(),
+        amount: formData.amount,
+        scanUrl: `${apiUrl}/api/qr-scan/${encodeURIComponent(formData.email)}`
+      });
       setSuccess(true);
     } catch (err: any) {
       console.error('Error:', err);
@@ -156,41 +160,68 @@ const QRCodeGenerator = () => {
     const img = new Image();
 
     img.onload = () => {
-      // Set canvas size to accommodate QR code and text
-      canvas.width = 512;
-      canvas.height = 512;
-      
-      // Fill white background
-      ctx!.fillStyle = 'white';
+      // New design: larger canvas, better layout, branding
+      canvas.width = 600;
+      canvas.height = 800;
+      ctx!.fillStyle = '#fff';
       ctx!.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw QR code
-      ctx!.drawImage(img, 128, 64, 256, 256);
-      
-      // Add text
-      ctx!.fillStyle = '#1F2937';
-      ctx!.font = 'bold 24px Arial';
-      ctx!.textAlign = 'center';
-      ctx!.fillText(`${formData.email.split('@')[0]} USDC Payment Address`, canvas.width/2, 40);
-      
-      ctx!.font = '16px Arial';
-      ctx!.fillText('Scan to pay with USDC on Base', canvas.width/2, 340);
-      
-      if (formData.amount) {
-        ctx!.fillText(`Requested Amount: ${formData.amount} USDC`, canvas.width/2, 370);
-      }
-      
-      // ctx!.fillText('Generation Fee: 0.30 USDC', canvas.width/2, 400);
-      
-      // Add wallet address
-      ctx!.font = '14px monospace';
-      ctx!.fillText(user?.wallet?.address || '', canvas.width/2, 440);
 
-      // Convert to PNG and download
+      // Title
+      ctx!.fillStyle = '#FF7300';
+      ctx!.font = 'bold 32px Arial';
+      ctx!.textAlign = 'center';
+      ctx!.fillText(`${displayData?.emailName || ''} USDC Payment`, canvas.width/2, 60);
+
+      // Subtitle
+      ctx!.fillStyle = '#222';
+      ctx!.font = '20px Arial';
+      ctx!.fillText('Scan to pay with USDC on Base', canvas.width/2, 100);
+
+      // QR code border
+      ctx!.strokeStyle = '#FF7300';
+      ctx!.lineWidth = 6;
+      ctx!.strokeRect(172, 130, 256, 256);
+
+      // Draw QR code
+      ctx!.drawImage(img, 175, 133, 250, 250);
+
+      // Memo
+      ctx!.fillStyle = '#222';
+      ctx!.font = '18px Arial';
+      ctx!.fillText(`Memo: ${displayData?.memo || ''}`, canvas.width/2, 420);
+
+      // Amount
+      if (displayData?.amount) {
+        ctx!.fillStyle = '#222';
+        ctx!.font = '18px Arial';
+        ctx!.fillText(`Requested Amount: ${displayData.amount} USDC`, canvas.width/2, 450);
+      }
+
+      // Fee
+      ctx!.fillStyle = '#888';
+      ctx!.font = '16px Arial';
+      ctx!.fillText('QR Generation Fee: 0.30 USDC', canvas.width/2, 480);
+
+      // Wallet address
+      ctx!.fillStyle = '#222';
+      ctx!.font = '16px monospace';
+      ctx!.fillText(displayData?.wallet || '', canvas.width/2, 520);
+
+      // Scan URL
+      ctx!.fillStyle = '#444';
+      ctx!.font = '14px Arial';
+      ctx!.fillText(displayData?.scanUrl || '', canvas.width/2, 560);
+
+      // Branding
+      ctx!.fillStyle = '#FF7300';
+      ctx!.font = 'bold 18px Arial';
+      ctx!.fillText('Powered by BasePayQR', canvas.width/2, 780);
+
+      // Download
       const pngFile = canvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
-      const emailName = formData.email.split('@')[0];
-      downloadLink.download = `${emailName}-qr.png`;
+      const emailName = displayData?.emailName || 'qr';
+      downloadLink.download = `${emailName}-basepayqr.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
     };
@@ -316,7 +347,7 @@ const QRCodeGenerator = () => {
               <div className="text-center animate-fadeIn">
                 <div className="bg-white p-6 rounded-lg shadow-lg inline-block mb-4">
                   <div className="text-gray-800 font-medium mb-2">
-                    {formData.email.split('@')[0]} USDC Payment Address
+                    {displayData?.emailName} USDC Payment Address
                   </div>
                   <QRCodeSVG 
                     id="qr-code-svg"
@@ -328,9 +359,9 @@ const QRCodeGenerator = () => {
                   <div className="text-gray-600 text-sm mt-2">
                     Scan to pay with USDC on Base
                   </div>
-                  {formData.amount && (
+                  {displayData?.amount && (
                     <div className="text-gray-600 text-sm mt-1">
-                      Requested Amount: {formData.amount} USDC
+                      Requested Amount: {displayData.amount} USDC
                     </div>
                   )}
                   <div className="text-gray-600 text-sm mt-1">
@@ -340,7 +371,7 @@ const QRCodeGenerator = () => {
                 <div className="mb-4 text-gray-300">
                   <p className="font-medium mb-1">USDC Payment Address:</p>
                   <p className="font-mono select-all cursor-pointer break-all" title="Click to select address">
-                    {user?.wallet?.address || ''}
+                    {displayData?.wallet || ''}
                   </p>
                 </div>
                 <button
