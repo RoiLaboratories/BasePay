@@ -77,6 +77,15 @@ const QRCodeGenerator = () => {
         throw new Error('Please enter a valid amount');
       }
 
+      // Check if email already has a QR code
+      const checkRes = await axios.get(`${apiUrl}/api/qr-codes/check?email=${encodeURIComponent(formData.email)}`);
+      if (checkRes.data.exists) {
+        setError('This email already has a QR code generated');
+        setLoading(false);
+        setPaymentStatus('failed');
+        return;
+      }
+
       // Initialize ethers provider and USDC contract
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
@@ -93,7 +102,12 @@ const QRCodeGenerator = () => {
 
       const emailName = formData.email.split('@')[0];
       const qrData = user.wallet.address; // QR code value is just the wallet address
-
+      // const display = [
+      //   `USDC Payment Address: ${user.wallet.address}`,
+      //   `Memo: ${formData.memo.trim()}`,
+      //   formData.amount ? `Amount: ${formData.amount} USDC` : null,
+      //   `Scan URL: ${apiUrl}/api/qr-scan/${encodeURIComponent(formData.email)}`
+      // ].filter(Boolean).join('\n');
       const paymentData = {
         wallet_address: user.wallet.address,
         email: formData.email,
