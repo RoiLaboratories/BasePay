@@ -85,7 +85,47 @@ const App = () => {
           theme: 'dark',
           accentColor: '#FF6B00',
         },
-        walletConnectCloudProjectId: import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID
+        walletConnectCloudProjectId: import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID,
+        defaultChain: {
+          id: 8453,
+          name: 'Base',
+          rpcUrls: {
+            default: {
+              http: ['https://mainnet.base.org']
+            }
+          },
+          nativeCurrency: {
+            name: 'ETH',
+            symbol: 'ETH',
+            decimals: 18
+          },
+          blockExplorers: {
+            default: {
+              name: 'BaseScan',
+              url: 'https://basescan.org'
+            }
+          }
+        },
+        supportedChains: [{
+          id: 8453,
+          name: 'Base',
+          rpcUrls: {
+            default: {
+              http: ['https://mainnet.base.org']
+            }
+          },
+          nativeCurrency: {
+            name: 'ETH',
+            symbol: 'ETH',
+            decimals: 18
+          },
+          blockExplorers: {
+            default: {
+              name: 'BaseScan',
+              url: 'https://basescan.org'
+            }
+          }
+        }]
       }}
     >
       <AppContent />
