@@ -95,7 +95,7 @@ const App = () => {
             }
           },
           nativeCurrency: {
-            name: 'Ether',
+            name: 'ETH',
             symbol: 'ETH',
             decimals: 18
           },
@@ -115,7 +115,7 @@ const App = () => {
             }
           },
           nativeCurrency: {
-            name: 'Ether',
+            name: 'ETH',
             symbol: 'ETH',
             decimals: 18
           },
